@@ -13,51 +13,52 @@ class _HomepageState extends State<Homepage> {
   List<dynamic> availableClients = [];
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
-  RTCPeerConnection? _peerConnection;
-  bool onLoading = true;
-  final TextEditingController _controller = TextEditingController();
+  late RTCPeerConnection _peerConnection;
   late WebSocketChannel channel;
+  bool onLoading = true;
   int? senderId;
 
-  // Future<void> registerPeerConnection() async {
-  //     final Map<String, dynamic> configuration = {
-  //       'iceServers': [
-  //         {
-  //           'urls': [
-  //             'stun:stun1.l.google.com:19302',
-  //             'stun:stun2.l.google.com:19302'
-  //           ]
-  //         }
-  //       ]
-  //     };
-  //     // MediaStream stream = await navigator.mediaDevices.getUserMedia(constraints)
-  //     _localRenderer.srcObject = await navigator.mediaDevices.getUserMedia({
-  //       "audio" : true,
-  //       "video" : {
-  //         "facingMode" : "user"
-  //       }
-  //     });
-  //     _peerConnection = await createPeerConnection(configuration);
+  Future<void> setupRenderer(RTCVideoRenderer localRenderer, RTCVideoRenderer remoteRenderer, RTCPeerConnection? peerConnection) async {
+     localRenderer.srcObject = await navigator.mediaDevices.getUserMedia({
+        "audio" : true,
+        "video" : {
+          "facingMode" : "user"
+        }
+      });
 
-  //     _localRenderer.srcObject!.getTracks().forEach((track){
-  //       _peerConnection!.addTrack(track, _localRenderer.srcObject!);
-  //     });
+      localRenderer.srcObject!.getTracks().forEach((track){
+        peerConnection!.addTrack(track, localRenderer.srcObject!);
+      });
       
-  //     _peerConnection!.onTrack = (RTCTrackEvent event){
-  //       _remoteRenderer.srcObject = event.streams[0];
-  //     };
+      peerConnection!.onTrack = (RTCTrackEvent event){
+        remoteRenderer.srcObject = event.streams[0];
+      };
 
-  //     _peerConnection!.onConnectionState = (e) {
-  //       print(e);
-  //     };
+      peerConnection!.onConnectionState = (e) {
+        print(e);
+      };
 
-  //     _peerConnection!.onAddStream = (MediaStream stream) {
-  //       _remoteRenderer.srcObject = stream;
-  //       setState(() {});
-  //     };
-  //   }
+      peerConnection!.onAddStream = (MediaStream stream) {
+        remoteRenderer.srcObject = stream;
+        setState(() {});
+      };
+  }
 
-    Future<void> setupWebsocket() async {
+  Future<void> registerPeerConnection() async {
+      final Map<String, dynamic> configuration = {
+        'iceServers': [
+          {
+            'urls': [
+              'stun:stun1.l.google.com:19302',
+              'stun:stun2.l.google.com:19302'
+            ]
+          }
+        ]
+      };
+      _peerConnection = await createPeerConnection(configuration);
+    }
+
+    Future<void> setupWebsocket(RTCPeerConnection peerConnection) async {
         channel = WebSocketChannel.connect(Uri.parse("ws://localhost:8080/socket"));
         // channel.sink.add(jsonEncode({ //TODO : assign random id
         //   "type" : "myId", 
@@ -72,6 +73,7 @@ class _HomepageState extends State<Homepage> {
                 senderId = mp["senderId"];
                 List<dynamic> x = jsonDecode(mp["list"]);
                 availableClients = x;
+                // availableClients.remove(senderId);
               });
               print("i am : $senderId");
               break;
@@ -80,10 +82,11 @@ class _HomepageState extends State<Homepage> {
               setState(() {
                   List<dynamic> x = jsonDecode(mp["list"]);
                   availableClients = x;
+                  // availableClients.remove(senderId);
                 });
 
             case "offer" :
-              _peerConnection!.onIceCandidate = (RTCIceCandidate iceCandidate){ //TODO:
+              peerConnection!.onIceCandidate = (RTCIceCandidate iceCandidate){ //TODO:
                 channel.sink.add(jsonEncode({
                   "type" : "ice",
                   "senderId" : mp["toId"],
@@ -93,14 +96,14 @@ class _HomepageState extends State<Homepage> {
                   "toId" : mp["senderId"],
                 }));
               }; 
-              await _peerConnection!.setRemoteDescription(
+              await peerConnection!.setRemoteDescription(
                 RTCSessionDescription(
                   mp["sdp"],
                   mp["type"]
                 )
               );
-              RTCSessionDescription answer = await _peerConnection!.createAnswer();
-              await _peerConnection!.setLocalDescription(answer);
+              RTCSessionDescription answer = await peerConnection!.createAnswer();
+              await peerConnection!.setLocalDescription(answer);
               channel.sink.add(jsonEncode({
                 "type" : "answer",
                 "senderId" : mp["toId"],
@@ -114,7 +117,7 @@ class _HomepageState extends State<Homepage> {
                 mp["sdp"],
                 mp["type"]
               );
-              await _peerConnection!.setRemoteDescription(answer);
+              await peerConnection!.setRemoteDescription(answer);
               break;
 
             case "ice" :
@@ -124,7 +127,7 @@ class _HomepageState extends State<Homepage> {
                 mp["sdpMid"],
                 mp["sdpMLineIndex"]
               );
-              _peerConnection!.addCandidate(iceCandidate);
+              peerConnection!.addCandidate(iceCandidate);
               break;
 
             default:
@@ -160,8 +163,9 @@ class _HomepageState extends State<Homepage> {
 
 
   Future<void> setupRoom() async {
-    // await registerPeerConnection();
-    await setupWebsocket();
+    await registerPeerConnection();
+    // await setupRenderer(_localRenderer, _remoteRenderer, _peerConnection);
+    await setupWebsocket(_peerConnection);
     setState(() {
       onLoading = false; //TODO : loading success
     });
@@ -175,18 +179,17 @@ class _HomepageState extends State<Homepage> {
 
   @override
   void initState() {
-    // _initializeRenderers();
+    _initializeRenderers();
     setupRoom();
     super.initState();
   }
 
   @override
   void dispose() {
-    // _localRenderer.dispose();
-    // _remoteRenderer.dispose();
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -233,19 +236,25 @@ class _HomepageState extends State<Homepage> {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     trailing: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                               // Navigate to Video Call Page
-                              createOfferToId(client);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => VideoCallPage(
-                                    clientId: senderId!, //TODO : gene random
-                                    toId: client,
-                                    channel: channel,
+                              await setupRenderer(_localRenderer, _remoteRenderer, _peerConnection);
+                              await createOfferToId(client);
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => VideoCallPage(
+                                      clientId: senderId!, //TODO : gene random
+                                      // toId: client,
+                                      channel: channel,
+                                      localRenderer: _localRenderer,
+                                      remoteRenderer: _remoteRenderer,
+                                      peerConnection: _peerConnection,
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
@@ -259,6 +268,26 @@ class _HomepageState extends State<Homepage> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await setupRenderer(_localRenderer, _remoteRenderer, _peerConnection);
+          if (context.mounted){
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VideoCallPage(
+                  clientId: senderId!, //TODO : gene random
+                  channel: channel,
+                  localRenderer: _localRenderer,
+                  remoteRenderer: _remoteRenderer,
+                  peerConnection: _peerConnection,
+                ),
+              ),
+            );
+          }
+        },
+        child: Icon(Icons.room_preferences_sharp),
       ),
     );
   }
