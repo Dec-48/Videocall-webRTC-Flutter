@@ -9,7 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  logger:
   flutter_webrtc:
+  web_socket_channel: 
 
 dev_dependencies:
   flutter_test:
