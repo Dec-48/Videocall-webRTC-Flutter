@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:videocall_webrtc/pages/VideoCallPage.dart';
-import 'package:videocall_webrtc/pages/LoginPage.dart';
 import 'package:videocall_webrtc/pages/homepage.dart';
 
 void main() {
