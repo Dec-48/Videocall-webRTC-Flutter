@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:videocall_webrtc/pages/homepage.dart';
+import 'package:videocall_webrtc/pages/ListPage.dart';
 
 void main() {
   runApp(const MainApp());
@@ -14,14 +14,14 @@ class MainApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: "Visit (Locally)",
       // home: VideoCallPage(clientId: 12345,), //TODO : gen random
-      home: Homepage(),
+      home: Listpage(),
       theme: ThemeData.dark(useMaterial3: true),
-      routes: {
-        // '': (context) => Loginpage(),
-        // "/home" : (context) => Homepage(),
+      // routes: {
+      //   '': (context) => Loginpage(),
+      //   "/home" : (context) => Homepage(),
       //   "/login" : (context) => Loginpage(),
       //   "/call" : (context) => VideoCallPage()
-      },
+      // },
     );
   }
 }

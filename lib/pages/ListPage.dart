@@ -7,13 +7,13 @@ import 'package:videocall_webrtc/pages/VideoCallPage.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'dart:convert';
-class Homepage extends StatefulWidget {
-  const Homepage({super.key});
+class Listpage extends StatefulWidget {
+  const Listpage({super.key});
   @override
-  State<Homepage> createState() => _HomepageState();
+  State<Listpage> createState() => _ListpageState();
 }
 
-class _HomepageState extends State<Homepage> {
+class _ListpageState extends State<Listpage> {
   List<dynamic> availableClients = [];
   late WebSocketChannel channel;
   late Stream broadcastStream;
@@ -104,32 +104,19 @@ class _HomepageState extends State<Homepage> {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     trailing: ElevatedButton(
-                      onPressed: () async {
-                                RTCPeerConnection pc = await createPeerConnection({
-                                  'iceServers': [
-                                    {
-                                      'urls': [
-                                        'stun:stun1.l.google.com:19302',
-                                        'stun:stun2.l.google.com:19302'
-                                      ]
-                                    }
-                                  ]
-                                });
-                                if (context.mounted){
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => VideoCallPage(
-                                        broadcastStream: broadcastStream,
-                                        channel: channel,
-                                        isCalling: true,
-                                        myId: myId!,
-                                        toId: client,
-                                        peerConnection: pc,
-                                      ),
-                                    ),
-                                  );
-                                }
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VideoCallPage(
+                              broadcastStream: broadcastStream,
+                              channel: channel,
+                              isCalling: true,
+                              myId: myId!,
+                              toId: client,
+                            ),
+                          ),
+                        );
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
@@ -145,32 +132,19 @@ class _HomepageState extends State<Homepage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          RTCPeerConnection pc = await createPeerConnection({
-        'iceServers': [
-          {
-            'urls': [
-              'stun:stun1.l.google.com:19302',
-              'stun:stun2.l.google.com:19302'
-            ]
-          }
-        ]
-      });
-          if (context.mounted){
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VideoCallPage(
-                  broadcastStream: broadcastStream,
-                  channel: channel,
-                  isCalling: false,
-                  myId: myId!,
-                  toId: -99,
-                  peerConnection: pc
-                ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoCallPage(
+                broadcastStream: broadcastStream,
+                channel: channel,
+                isCalling: false,
+                myId: myId!,
+                toId: -99,
               ),
-            );
-          }
+            ),
+          );
         },
         child: Icon(Icons.room_preferences_sharp),
       ),
