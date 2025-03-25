@@ -5,8 +5,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:videocall_webrtc/pages/VideoCallPage.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'dart:convert';
+
 class Listpage extends StatefulWidget {
   const Listpage({super.key});
   @override
@@ -17,42 +17,44 @@ class _ListpageState extends State<Listpage> {
   List<dynamic> availableClients = [];
   late WebSocketChannel channel;
   late Stream broadcastStream;
-  bool onLoading = true;
-  int? myId;
+  int? userId;
 
-  Future<void> setupBroadcasts() async {
+  Future<void> setUpBroadCastStream() async {
     channel = WebSocketChannel.connect(Uri.parse("ws://localhost:8080/socket"));
     broadcastStream = channel.stream.asBroadcastStream();
   }
 
-  void setOnmessage(){
+  void setUpOnMessage() {
     broadcastStream.listen((message) {
-      Map<String, dynamic> mp = jsonDecode(message);  
-      switch (mp["type"]){
-        case "initial" :
+      Map<String, dynamic> mp = jsonDecode(message);
+      switch (mp["messageType"]) {
+        case "INITIAL":
           setState(() {
-            myId = mp["myId"];
-            List<dynamic> x = jsonDecode(mp["list"]);
+            userId = mp["userId"];
+            List<dynamic> x = mp["clientList"];
             availableClients = x;
-            availableClients.remove(myId);
+            availableClients.remove(userId);
           });
-          print("i am : $myId");
           break;
-        case "fetchList":
+        case "BROADCAST":
           setState(() {
-                  List<dynamic> x = jsonDecode(mp["list"]);
-                  availableClients = x;
-                  availableClients.remove(myId);
-                });
+            List<dynamic> x = mp["clientList"];
+            availableClients = x;
+            availableClients.remove(userId);
+          });
           break;
       }
     });
   }
 
+  Future<void> setUpWebSocketConnection() async {
+    await setUpBroadCastStream();
+    setUpOnMessage();
+  }
+
   @override
   void initState() {
-    setupBroadcasts();
-    setOnmessage();
+    setUpWebSocketConnection();
     super.initState();
   }
 
@@ -93,7 +95,7 @@ class _ListpageState extends State<Listpage> {
                   elevation: 3,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor:Colors.green,
+                      backgroundColor: Colors.green,
                       child: Icon(
                         Icons.person,
                         color: Colors.white,
@@ -101,7 +103,8 @@ class _ListpageState extends State<Listpage> {
                     ),
                     title: Text(
                       "$client",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     trailing: ElevatedButton(
                       onPressed: () {
@@ -112,12 +115,12 @@ class _ListpageState extends State<Listpage> {
                               broadcastStream: broadcastStream,
                               channel: channel,
                               isCalling: true,
-                              myId: myId!,
+                              myId: userId!,
                               toId: client,
                             ),
                           ),
                         );
-                            },
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         disabledBackgroundColor: Colors.grey,
@@ -140,7 +143,7 @@ class _ListpageState extends State<Listpage> {
                 broadcastStream: broadcastStream,
                 channel: channel,
                 isCalling: false,
-                myId: myId!,
+                myId: userId!,
                 toId: -99,
               ),
             ),
