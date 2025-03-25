@@ -12,6 +12,7 @@ dependencies:
   logger:
   flutter_webrtc:
   web_socket_channel: 
+  http:
 
 dev_dependencies:
   flutter_test:

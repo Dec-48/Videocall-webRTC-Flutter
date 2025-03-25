@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:videocall_webrtc/pages/VideoCallPage.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class Listpage extends StatefulWidget {
   const Listpage({super.key});
@@ -15,8 +16,10 @@ class Listpage extends StatefulWidget {
 
 class _ListpageState extends State<Listpage> {
   List<dynamic> availableClients = [];
+  List<dynamic> statusClients = [];
   late WebSocketChannel channel;
   late Stream broadcastStream;
+  StreamSubscription<dynamic>? subscription;
   int? userId;
 
   Future<void> setUpBroadCastStream() async {
@@ -25,22 +28,30 @@ class _ListpageState extends State<Listpage> {
   }
 
   void setUpOnMessage() {
-    broadcastStream.listen((message) {
+    subscription = broadcastStream.listen((message) {
       Map<String, dynamic> mp = jsonDecode(message);
       switch (mp["messageType"]) {
         case "INITIAL":
           setState(() {
             userId = mp["userId"];
             List<dynamic> x = mp["clientList"];
+            List<dynamic> y = mp["clientStatusList"];
             availableClients = x;
-            availableClients.remove(userId);
+            statusClients = y;
+            int idx = availableClients.indexOf(userId);
+            availableClients.removeAt(idx);
+            statusClients.removeAt(idx);
           });
           break;
         case "BROADCAST":
           setState(() {
             List<dynamic> x = mp["clientList"];
+            List<dynamic> y = mp["clientStatusList"];
             availableClients = x;
-            availableClients.remove(userId);
+            statusClients = y;
+            int idx = availableClients.indexOf(userId);
+            availableClients.removeAt(idx);
+            statusClients.removeAt(idx);
           });
           break;
       }
@@ -68,7 +79,7 @@ class _ListpageState extends State<Listpage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Available Clients'),
-        backgroundColor: Colors.blueGrey,
+        backgroundColor: Theme.of(context).primaryColorDark,
       ),
       body: Column(
         children: [
@@ -87,6 +98,8 @@ class _ListpageState extends State<Listpage> {
               itemCount: availableClients.length,
               itemBuilder: (context, index) {
                 final client = availableClients[index];
+                // final status = statusClients[index];
+                final status = true;
                 return Card(
                   margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   shape: RoundedRectangleBorder(
@@ -95,10 +108,8 @@ class _ListpageState extends State<Listpage> {
                   elevation: 3,
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Colors.green,
                       child: Icon(
                         Icons.person,
-                        color: Colors.white,
                       ),
                     ),
                     title: Text(
@@ -107,25 +118,29 @@ class _ListpageState extends State<Listpage> {
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     trailing: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => VideoCallPage(
-                              broadcastStream: broadcastStream,
-                              channel: channel,
-                              isCalling: true,
-                              myId: userId!,
-                              toId: client,
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        disabledBackgroundColor: Colors.grey,
-                      ),
-                      child: Text('Connect'),
+                      // onPressed: null,
+                      onPressed: (status)
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => VideoCallPage(
+                                    listPageSubscription: subscription!,
+                                    broadcastStream: broadcastStream,
+                                    channel: channel,
+                                    isCalling: true,
+                                    myId: userId!,
+                                    toId: client,
+                                  ),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.call), // Blocked icon
+                        SizedBox(width: 8),
+                        Text('Connect'),
+                      ]),
                     ),
                   ),
                 );
@@ -139,7 +154,9 @@ class _ListpageState extends State<Listpage> {
           Navigator.push(
             context,
             MaterialPageRoute(
+              //set up room and wait for offer sdp
               builder: (context) => VideoCallPage(
+                listPageSubscription: subscription!,
                 broadcastStream: broadcastStream,
                 channel: channel,
                 isCalling: false,
@@ -149,7 +166,7 @@ class _ListpageState extends State<Listpage> {
             ),
           );
         },
-        child: Icon(Icons.room_preferences_sharp),
+        child: Icon(Icons.video_call),
       ),
     );
   }

@@ -6,8 +6,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:http/http.dart' as http;
 
 class VideoCallPage extends StatefulWidget {
+  final StreamSubscription<dynamic> listPageSubscription;
   final Stream broadcastStream;
   final WebSocketChannel channel;
   final bool isCalling;
@@ -15,6 +17,7 @@ class VideoCallPage extends StatefulWidget {
   final int toId;
   const VideoCallPage({
     super.key,
+    required this.listPageSubscription,
     required this.channel,
     required this.broadcastStream,
     required this.isCalling,
@@ -27,7 +30,6 @@ class VideoCallPage extends StatefulWidget {
 }
 
 class _VideoCallPageState extends State<VideoCallPage> {
-  bool onLoading = true;
   bool isHangup = false;
   RTCVideoRenderer? _localRenderer = RTCVideoRenderer();
   RTCVideoRenderer? _remoteRenderer = RTCVideoRenderer();
@@ -50,10 +52,10 @@ class _VideoCallPageState extends State<VideoCallPage> {
               "toId": mp["myId"],
             }));
           };
-          await _peerConnection!.setRemoteDescription(
-              RTCSessionDescription(mp["sdp"], mp["type"]));
+          await _peerConnection!.setRemoteDescription(RTCSessionDescription(
+              mp["sdp"], mp["type"])); //set remote sdp as a incoming offer
           RTCSessionDescription answer = await _peerConnection!.createAnswer();
-          await _peerConnection!.setLocalDescription(answer);
+          await _peerConnection!.setLocalDescription(answer); //set local sdp
           channel.sink.add(jsonEncode({
             "type": "answer",
             "myId": mp["toId"],
@@ -63,13 +65,13 @@ class _VideoCallPageState extends State<VideoCallPage> {
           break;
 
         case "answer":
-          print(mp["type"]);
+          // print(mp["type"]);
           RTCSessionDescription answer =
               RTCSessionDescription(mp["sdp"], mp["type"]);
           try {
             await _peerConnection!.setRemoteDescription(answer);
           } catch (e) {
-            print(e.toString());
+            // print(e.toString());
           }
           break;
 
@@ -87,17 +89,10 @@ class _VideoCallPageState extends State<VideoCallPage> {
     });
   }
 
-  void unsubscription() async {
-    if (subscription != null) {
-      await subscription!.cancel();
-      subscription = null;
-    }
-  }
-
   Future<void> createOfferToId(int toId, WebSocketChannel channel) async {
     RTCSessionDescription offer =
         await _peerConnection!.createOffer({'offerToReceiveVideo': 1});
-    _peerConnection!.setLocalDescription(offer);
+    _peerConnection!.setLocalDescription(offer); //set local sdp
     //Send to toId
     channel.sink.add(jsonEncode({
       "type": offer.type,
@@ -156,10 +151,13 @@ class _VideoCallPageState extends State<VideoCallPage> {
     await registerPeerConnection();
     await _initializeRenderers();
     await setupRenderer();
-    if (widget.isCalling) {
-      createOfferToId(widget.toId, widget.channel);
-    }
     setUpOnMessage(widget.broadcastStream, widget.channel);
+    if (widget.isCalling) {
+      await createOfferToId(widget.toId, widget.channel);
+      // http.post(Uri.parse("http://localhost:8080/close-room/${widget.myId}"));
+    } else {
+      // http.post(Uri.parse("http://localhost:8080/open-room/${widget.myId}"));
+    }
   }
 
   Future<void> _dispose() async {
@@ -171,7 +169,7 @@ class _VideoCallPageState extends State<VideoCallPage> {
             .getTracks()
             .forEach((track) => track.stop());
       } catch (e) {
-        print(e.toString());
+        // print(e.toString());
       }
     }
 
@@ -197,11 +195,21 @@ class _VideoCallPageState extends State<VideoCallPage> {
   @override
   void initState() {
     setupRoom();
+    // widget.listPageSubscription.pause();
     super.initState();
   }
 
   @override
   void dispose() {
+    void unsubscription() async {
+      if (subscription != null) {
+        await subscription!.cancel();
+        subscription = null;
+      }
+      // http.post(Uri.parse("http://localhost:8080/closed-room/${widget.myId}"));
+    }
+
+    // widget.listPageSubscription.resume();
     unsubscription();
     _dispose();
     super.dispose();
@@ -218,11 +226,10 @@ class _VideoCallPageState extends State<VideoCallPage> {
         children: [
           // Remote Video Feed (Main View)
           Positioned.fill(
-            child: Container(
-              child: RTCVideoView(
-                _remoteRenderer!,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-              ),
+            child: RTCVideoView(
+              //! : try to removing container
+              _remoteRenderer!,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
             ),
           ),
 
@@ -238,7 +245,6 @@ class _VideoCallPageState extends State<VideoCallPage> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    //TODO color: Colors.black.withOpacity(0.5),
                     blurRadius: 8,
                     offset: Offset(0, 4),
                   ),
@@ -264,11 +270,11 @@ class _VideoCallPageState extends State<VideoCallPage> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  //TODO color: Colors.grey.shade900.withOpacity(0.8),
+                  // color: Colors.grey.shade900.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(50),
                   boxShadow: [
                     BoxShadow(
-                      //TODO color: Colors.black.withOpacity(0.6),
+                      // color: Colors.black.withOpacity(0.6),
                       blurRadius: 10,
                       offset: Offset(0, 4),
                     ),
@@ -292,7 +298,9 @@ class _VideoCallPageState extends State<VideoCallPage> {
                             // hangUp();
                             // setState(() {
                             //   isHangup = true;
-                            // });
+                            // });      await http
+                            // http.post(Uri.parse(
+                            //     "http://localhost:8080/close-room/${widget.myId}"));
                             Navigator.pop(context);
                           },
                           icon: Icon(Icons.call_end, color: Colors.red),
